@@ -1,0 +1,436 @@
+
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Driive</title>
+    <link rel="stylesheet" href="style-dark.css" />
+    <link rel="shortcut icon" type="image/png" href="favicon.png" />
+</head>
+
+<body class="stackedit">
+    <div class="stackedit__left">
+        <div class="stackedit__toc">
+            <ul>
+                <li><a href="#top">Driive</a>
+                    <ul>
+                        <li><a href="#feature-list">Feature list</a></li>
+                        <li><a href="#controls">Controls</a></li>
+                        <ul>
+                            <li><a href="#driving">Driving</a></li>
+                            <li><a href="#drive-modes">Drive modes</a></li>
+                        </ul>
+                        <li><a href="#implementation">Implementation</a></li>
+                        <li><a href="#the-code">The code</a></li>
+                        <ul>
+                            <li><a href="#initial-variables">Initial variables</a></li>
+                            <li><a href="#the-loop">The loop</a></li>
+                            <ul>
+                                <li><a href="#gamepad-input">Gamepad input</a></li>
+                                <li><a href="#to-polar-coordinates">To polar coordinates</a></li>
+                                <li><a href="#drive-modes-1">Drive modes</a></li>
+                                <li><a href="#wheel-powers">Wheels powers</a></li>
+                                <li><a href="#drive-mode-controls">Drive mode controls</a></li>
+                                <li><a href="#telemetry">Telemetry</a></li>
+                            </ul>
+                            <li><a href="#wrap"><code>wrap()</code></a></li>
+                        </ul>
+                        <li><a href="#how-it-works">How it works</a></li>
+                    </ul>
+                </li>
+            </ul>
+        </div>
+    </div>
+    <div class="stackedit__right">
+        <div class="stackedit__html">
+            <h1 id="img-src256icon.png-height25px-driive"><img src="256icon.png" height="25px"> Driive</h1>
+            <p><em>An easy-to-use, feature rich codebase for the drivetrain of omnibots</em></p>
+            <h2 id="feature-list">Feature list</h2>
+            <ul>
+                <li>Various drive modes
+                    <ul>
+                        <li>
+                            <dl>
+                                <dt><mark>Field-centric drive</mark></dt>
+                                <dd>Uses any given direction in the environment as forwards instead of the front of the robot</dd>
+                            </dl>
+                        </li>
+                        <li>
+                            <dl>
+                                <dt>Self-righting drive</dt>
+                                <dd>Maintains robot rotation unless rotated by controller</dd>
+                            </dl>
+                        </li>
+                    </ul>
+                </li>
+                <li>
+                    <dl>
+                        <dt><mark>Works with any omni drive train</mark></dt>
+                        <dd>Runs with any number of wheels</dd>
+                    </dl>
+                </li>
+                <li>
+                    <dl>
+                        <dt>Speed control</dt>
+                        <dd>Increase/decrease drive speed on the fly</dd>
+                    </dl>
+                </li>
+                <li>
+                    <dl>
+                        <dt>Preset turns</dt>
+                        <dd>Turn 180°, 90°, etc. with one button press</dd>
+                    </dl>
+                </li>
+                <li>
+                    <dl>
+                        <dt>Exponential speed control</dt>
+                        <dd>Gives <mark>more maneuverability at lower speeds</mark></dd>
+                    </dl>
+                </li>
+            </ul>
+            <h2 id="controls">Controls</h2>
+            <h3 id="driving">Driving</h3>
+            <ul>
+                <li>Translation: <strong>left joystick</strong></li>
+                <li>Rotation: <strong>right joystick</strong>
+                    <ul>
+                        <li><strong>Back</strong> and <strong>start</strong> turn the robot -90° and 90° respectively</li>
+                    </ul>
+                </li>
+            </ul>
+            <h3 id="drive-modes">Drive modes</h3>
+            <p>The current state of all drive modes, as well as a quick reference for the controls</p>
+            <ul>
+                <li>Field centric drive: <strong>toggled with X</strong>
+                    <ul>
+                        <li>On: One compass point, such as north, is forwards
+                            <ul>
+                                <li>Forwards can be reset with <strong>shift<sup class="footnote-ref"><a href="#fn1" id="fnref1">1</a></sup>+X</strong></li>
+                            </ul>
+                        </li>
+                        <li>Off: One side of the robot is forwards</li>
+                    </ul>
+                </li>
+                <li><abbr title="Self-righting">Righteous</abbr> drive<sup class="footnote-ref"><a href="#fn2" id="fnref2">2</a></sup>: <strong>toggled with Y</strong>
+                    <ul>
+                        <li>When turned on, the robot will automatically correct small turns in its movement, maintaining its rotation, and therefore stay facing the same direction, unless rotated with the joystick.</li>
+                    </ul>
+                </li>
+                <li>Speed control: <strong>increased with A</strong>, <strong>decreased with B</strong>
+                    <ul>
+                        <li>Ranges from 1 (slowest) to 10 (fastest)</li>
+                    </ul>
+                </li>
+            </ul>
+            <h2 id="implementation">Implementation</h2>
+            <p>The codebase is written in such a way that any number of omniwheels, placed at any angle, can be driven.</p>
+            <ol>
+                <li>Update the wheels array with your configuration, in radians:<pre class=" language-java"><code class="prism  language-java"><span class="token comment">// Defines wheel positions</span>
+<span class="token keyword">double</span><span class="token punctuation">[</span><span class="token punctuation">]</span> wheels <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token class-name">double</span><span class="token punctuation">[</span><span class="token punctuation">]</span><span class="token punctuation">{</span><span class="token number">0</span><span class="token punctuation">,</span> <span class="token number">2.094</span><span class="token punctuation">,</span> <span class="token number">4.189</span><span class="token punctuation">}</span><span class="token punctuation">;</span>
+</code></pre>
+                </li>
+                <li>Adjust the number of <code>0</code>s in the powers array:<pre class=" language-java"><code class="prism  language-java"><span class="token comment">// Array for motor powers</span>
+<span class="token keyword">double</span><span class="token punctuation">[</span><span class="token punctuation">]</span> powers <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token class-name">double</span><span class="token punctuation">[</span><span class="token punctuation">]</span><span class="token punctuation">{</span> <span class="token number">0</span><span class="token punctuation">,</span><span class="token number">0</span><span class="token punctuation">,</span><span class="token number">0</span> <span class="token punctuation">}</span><span class="token punctuation">;</span>
+</code></pre>
+                </li>
+                <li>Add the commands, under <code>WHEEL POWERS</code>, to drive each wheel:<pre class=" language-java"><code class="prism  language-java">robot<span class="token punctuation">.</span>one<span class="token punctuation">.</span><span class="token function">setPower</span><span class="token punctuation">(</span>powers<span class="token punctuation">[</span><span class="token number">0</span><span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+robot<span class="token punctuation">.</span>two<span class="token punctuation">.</span><span class="token function">setPower</span><span class="token punctuation">(</span>powers<span class="token punctuation">[</span><span class="token number">1</span><span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+robot<span class="token punctuation">.</span>three<span class="token punctuation">.</span><span class="token function">setPower</span><span class="token punctuation">(</span>powers<span class="token punctuation">[</span><span class="token number">2</span><span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+</code></pre>
+                </li>
+            </ol>
+            <p>If you wish to customize preset turns, they are defined under:</p>
+            <pre class=" language-java"><code class="prism  language-java"><span class="token comment">// --- DRIVE MODE CONTROLS ---</span>
+<span class="token punctuation">.</span><span class="token punctuation">.</span><span class="token punctuation">.</span>
+<span class="token comment">// Preset turns</span>
+</code></pre>
+            <h2 id="the-code">The code</h2>
+            <h3 id="initial-variables">Initial variables</h3>
+            <ul>
+                <li>
+                    <dl>
+                        <dt><code>double[] wheels</code></dt>
+                        <dd>Holds the angles of the wheels</dd>
+                    </dl>
+                </li>
+                <li>
+                    <dl>
+                        <dt><code>double[] powers = new double[]{ 0,0,0 }</code></dt>
+                        <dd>Holds the powers for all wheels; initially <code>0</code></dd>
+                    </dl>
+                </li>
+                <li>
+                    <dl>
+                        <dt><code>float currentAngle = 0</code></dt>
+                        <dd>Holds the robot’s current angle from the gyroscope</dd>
+                    </dl>
+                </li>
+                <li>
+                    <dl>
+                        <dt><code>boolean fieldcentric</code> (default true)</dt>
+                        <dd>Current state of field-centric drive</dd>
+                    </dl>
+                </li>
+                <li>
+                    <dl>
+                        <dt><code>float zero</code> (default 0)</dt>
+                        <dd>Holds the current forward direction for field-centric drive</dd>
+                    </dl>
+                </li>
+                <li>
+                    <dl>
+                        <dt><code>boolean righteous</code> (default false)</dt>
+                        <dd>Holds the current state of <abbr title="self-righting">righteous</abbr> drive</dd>
+                    </dl>
+                </li>
+                <li>
+                    <dl>
+                        <dt><code>boolean turning = false</code></dt>
+                        <dd>Used to temporarily trigger self-righting code when a preset turn is invoked with <abbr title="self-rightingness">righteousness</abbr> disabled</dd>
+                    </dl>
+                </li>
+                <li>
+                    <dl>
+                        <dt><code>int speed</code> (default 10)</dt>
+                        <dd>The current scale of the overall speed of the robot</dd>
+                    </dl>
+                </li>
+                <li>
+                    <dl>
+                        <dt><code>.*switch = false</code></dt>
+                        <dd>Any variables with this suffix are for detecting presses of joystick buttons. At the end of every loop, the button states are recorded, using these. During the next loop, both the stored state and the new state are checked. If
+                            the previous state is false and the new state is true, the button was just pressed and the code can be triggered.</dd>
+                    </dl>
+                </li>
+                <li><code>double x,y,turn,r,theta,setangle,delta</code>
+                    <ul>
+                        <li>
+                            <dl>
+                                <dt><code>x</code></dt>
+                                <dd>current left joystick X position</dd>
+                            </dl>
+                        </li>
+                        <li>
+                            <dl>
+                                <dt><code>y</code></dt>
+                                <dd>current left joystick Y position</dd>
+                            </dl>
+                        </li>
+                        <li>
+                            <dl>
+                                <dt><code>turn</code></dt>
+                                <dd>current rotational speed being sent to the drive train</dd>
+                            </dl>
+                        </li>
+                        <li>
+                            <dl>
+                                <dt><code>r</code></dt>
+                                <dd>current translation speed of robot; defined with x<sup>2</sup>+y<sup>2</sup> — <em>polar coordinate</em></dd>
+                            </dl>
+                        </li>
+                        <li>
+                            <dl>
+                                <dt><code>theta</code></dt>
+                                <dd>current direction robot is being driven; defined with atan2(x, y) — <em>polar coordinate</em></dd>
+                            </dl>
+                        </li>
+                        <li>
+                            <dl>
+                                <dt><code>setangle</code></dt>
+                                <dd>current angle robot is attempting to obtain — <em><abbr title="self-righting">righteous</abbr></em></dd>
+                            </dl>
+                        </li>
+                        <li>
+                            <dl>
+                                <dt><code>delta</code></dt>
+                                <dd>needed rotation to obtain <code>setangle</code> — <em><abbr title="self-righting">righteous</abbr></em></dd>
+                            </dl>
+                        </li>
+                    </ul>
+                </li>
+            </ul>
+            <h3 id="the-loop">The loop</h3>
+            <ul>
+                <li><code>robot.updateGyro(5)</code>: update gyroscope info with 5 damping</li>
+                <li><code>currentAngle = robot.angles.thirdAngle</code>: updates currentAngle with the angle from the gyroscope</li>
+            </ul>
+            <h4 id="gamepad-input">Gamepad input</h4>
+            <pre class=" language-java"><code class="prism  language-java"> turn <span class="token operator">=</span> gamepad1<span class="token punctuation">.</span>right_stick_x<span class="token punctuation">;</span>
+ y <span class="token operator">=</span> gamepad1<span class="token punctuation">.</span>left_stick_y<span class="token punctuation">;</span>
+ x <span class="token operator">=</span> <span class="token operator">-</span>gamepad1<span class="token punctuation">.</span>left_stick_x<span class="token punctuation">;</span>
+</code></pre>
+            <p>Obtains updated joystick info</p>
+            <h4 id="to-polar-coordinates">To polar coordinates</h4>
+            <pre class=" language-java"><code class="prism  language-java">r <span class="token operator">=</span> Math<span class="token punctuation">.</span><span class="token function">min</span><span class="token punctuation">(</span>Math<span class="token punctuation">.</span><span class="token function">sqrt</span><span class="token punctuation">(</span>x<span class="token operator">*</span>x <span class="token operator">+</span> y<span class="token operator">*</span>y<span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token number">1</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+theta <span class="token operator">=</span> Math<span class="token punctuation">.</span><span class="token function">atan2</span><span class="token punctuation">(</span>x<span class="token punctuation">,</span> y<span class="token punctuation">)</span><span class="token punctuation">;</span>
+</code></pre>
+            <p>Converts from Cartesian coordinates (x, y) to polar coordinates (r, θ)</p>
+            <h4 id="drive-modes-1">Drive modes</h4>
+            <pre class=" language-java"><code class="prism  language-java"><span class="token keyword">if</span><span class="token punctuation">(</span>fieldcentric<span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    theta <span class="token operator">+=</span> Math<span class="token punctuation">.</span><span class="token function">toRadians</span><span class="token punctuation">(</span>currentAngle <span class="token operator">-</span> zero<span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token punctuation">}</span>
+</code></pre>
+            <p>Adds current direction, relative to the gyro and the current zero, to the joystick input. This effectively makes the robot dependent on the gyro as much as the joystick, and is the key to field-centricity.</p>
+            <pre class=" language-java"><code class="prism  language-java"><span class="token keyword">if</span><span class="token punctuation">(</span>righteous <span class="token operator">||</span> turning<span class="token punctuation">)</span> <span class="token punctuation">{</span>
+</code></pre>
+            <p>If <abbr title="self-righting">righteous</abbr> (or turning):</p>
+            <pre class=" language-java"><code class="prism  language-java">    <span class="token keyword">if</span><span class="token punctuation">(</span>turn <span class="token operator">==</span> <span class="token number">0.0</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+        delta <span class="token operator">=</span> currentAngle <span class="token operator">-</span> setangle<span class="token punctuation">;</span>
+        turn <span class="token operator">=</span> <span class="token function">wrap</span><span class="token punctuation">(</span>delta<span class="token punctuation">)</span> <span class="token operator">/</span> <span class="token number">180</span><span class="token punctuation">;</span>
+    <span class="token punctuation">}</span>
+</code></pre>
+            <p>If the user is not voluntarily turning, subtract the robot’s desired angle from its current angle and simulate joystick input to compensate.</p>
+            <pre class=" language-java"><code class="prism  language-java">    <span class="token keyword">else</span> <span class="token punctuation">{</span>
+        setangle <span class="token operator">=</span> currentAngle<span class="token punctuation">;</span>
+    <span class="token punctuation">}</span>
+</code></pre>
+            <p>If the user is turning, set our desired angle to our current angle.</p>
+            <pre class=" language-java"><code class="prism  language-java">    <span class="token keyword">if</span><span class="token punctuation">(</span>Math<span class="token punctuation">.</span><span class="token function">abs</span><span class="token punctuation">(</span>turn<span class="token punctuation">)</span> <span class="token operator">&lt;</span> <span class="token number">0.05</span><span class="token punctuation">)</span> turn <span class="token operator">=</span> <span class="token number">0</span><span class="token punctuation">;</span>
+    <span class="token keyword">if</span><span class="token punctuation">(</span>turn <span class="token operator">&lt;</span> <span class="token number">0.15</span> <span class="token operator">&amp;&amp;</span> turn <span class="token operator">&gt;</span> <span class="token number">0.05</span><span class="token punctuation">)</span> turn <span class="token operator">=</span> <span class="token number">0.15</span><span class="token punctuation">;</span>
+    <span class="token keyword">if</span><span class="token punctuation">(</span>turn <span class="token operator">&gt;</span> <span class="token operator">-</span><span class="token number">0.15</span> <span class="token operator">&amp;&amp;</span> turn <span class="token operator">&lt;</span> <span class="token operator">-</span><span class="token number">0.05</span><span class="token punctuation">)</span> turn <span class="token operator">=</span> <span class="token operator">-</span><span class="token number">0.15</span><span class="token punctuation">;</span>
+<span class="token punctuation">}</span>
+</code></pre>
+            <p>If our desired turn is under .05, don’t bother; it only results i squeaking motors. If it’s from .05 to .15, just send .15.</p>
+            <pre class=" language-java"><code class="prism  language-java"><span class="token keyword">if</span><span class="token punctuation">(</span>turning <span class="token operator">&amp;&amp;</span> turn <span class="token operator">==</span> <span class="token number">0</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    turning <span class="token operator">=</span> <span class="token boolean">false</span><span class="token punctuation">;</span>
+<span class="token punctuation">}</span>
+</code></pre>
+            <p>If the robot was temporarily <abbr title="self-righting">righteous</abbr> for a preset turn and has finished, cancel the temporary <abbr title="self-rightingness">righteousness</abbr>.</p>
+            <h4 id="wheel-powers">Wheel powers</h4>
+            <pre class=" language-java"><code class="prism  language-java">r <span class="token operator">=</span> r<span class="token operator">*</span>r<span class="token operator">*</span>r<span class="token punctuation">;</span>
+r <span class="token operator">=</span> r <span class="token operator">*</span> speed<span class="token operator">/</span><span class="token number">10.0</span><span class="token punctuation">;</span>
+</code></pre>
+            <p>Applies an exponential curve and the speed to the translational speed.</p>
+            <pre class=" language-java"><code class="prism  language-java"><span class="token keyword">for</span><span class="token punctuation">(</span><span class="token keyword">int</span> i <span class="token operator">=</span> <span class="token number">0</span><span class="token punctuation">;</span> i <span class="token operator">!=</span> wheels<span class="token punctuation">.</span>length<span class="token punctuation">;</span> i<span class="token operator">++</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    powers<span class="token punctuation">[</span>i<span class="token punctuation">]</span> <span class="token operator">=</span> <span class="token punctuation">(</span>Math<span class="token punctuation">.</span><span class="token function">sin</span><span class="token punctuation">(</span>wheels<span class="token punctuation">[</span>i<span class="token punctuation">]</span> <span class="token operator">-</span> theta<span class="token punctuation">)</span> <span class="token operator">*</span> r <span class="token punctuation">)</span> <span class="token operator">+</span> turn<span class="token punctuation">;</span>
+<span class="token punctuation">}</span>
+</code></pre>
+            <p>Calculate the power for each wheel:</p>
+            <ol>
+                <li><code>wheels[i] - theta</code>: Find the difference of the desired angle of movement and the angle of the wheel</li>
+                <li><code>sin()</code>: Calculate power based on the difference</li>
+                <li><code>*r</code>: Apply user-inputted power to the power</li>
+                <li><code>+turn</code>: Add turning speed to each wheel</li>
+            </ol>
+            <pre class=" language-java"><code class="prism  language-java">robot<span class="token punctuation">.</span>one<span class="token punctuation">.</span><span class="token function">setPower</span><span class="token punctuation">(</span>powers<span class="token punctuation">[</span><span class="token number">0</span><span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+robot<span class="token punctuation">.</span>two<span class="token punctuation">.</span><span class="token function">setPower</span><span class="token punctuation">(</span>powers<span class="token punctuation">[</span><span class="token number">1</span><span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+robot<span class="token punctuation">.</span>three<span class="token punctuation">.</span><span class="token function">setPower</span><span class="token punctuation">(</span>powers<span class="token punctuation">[</span><span class="token number">2</span><span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+</code></pre>
+            <p>Send powers to the motors.</p>
+            <h4 id="drive-mode-controls">Drive mode controls</h4>
+            <pre class=" language-java"><code class="prism  language-java"><span class="token keyword">if</span><span class="token punctuation">(</span>gamepad1<span class="token punctuation">.</span>guide <span class="token operator">&amp;&amp;</span> <span class="token operator">!</span>fcswitch <span class="token operator">&amp;&amp;</span> gamepad1<span class="token punctuation">.</span>x<span class="token punctuation">)</span>
+    zero <span class="token operator">=</span> currentAngle<span class="token punctuation">;</span>
+<span class="token punctuation">}</span>
+<span class="token keyword">else</span> <span class="token keyword">if</span><span class="token punctuation">(</span><span class="token operator">!</span>fcswitch <span class="token operator">&amp;&amp;</span> gamepad1<span class="token punctuation">.</span>x<span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    fieldcentric <span class="token operator">=</span> <span class="token operator">!</span>fieldcentric<span class="token punctuation">;</span>
+<span class="token punctuation">}</span>
+</code></pre>
+            <p>If the shift<sup class="footnote-ref"><a href="#fn1" id="fnref1:1">1</a></sup> key is held and X is pressed, reset zero. If X is pressed without shift, toggle field-centric.</p>
+            <pre class=" language-java"><code class="prism  language-java"><span class="token keyword">if</span><span class="token punctuation">(</span><span class="token operator">!</span>rgswitch <span class="token operator">&amp;&amp;</span> gamepad1<span class="token punctuation">.</span>y<span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    righteous <span class="token operator">=</span> <span class="token operator">!</span>righteous<span class="token punctuation">;</span>
+    setangle <span class="token operator">=</span> currentAngle<span class="token punctuation">;</span>
+<span class="token punctuation">}</span>
+</code></pre>
+            <p>If Y is pressed, toggle <abbr title="self-rightingness">righteousness</abbr> and set our desired angle to our current angle (to avoid turning as soon as it’s enabled).</p>
+            <pre class=" language-java"><code class="prism  language-java"><span class="token keyword">if</span><span class="token punctuation">(</span><span class="token operator">!</span>slswitch <span class="token operator">&amp;&amp;</span> gamepad1<span class="token punctuation">.</span>b <span class="token operator">&amp;&amp;</span> speed <span class="token operator">&gt;</span> <span class="token number">1</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    speed <span class="token operator">-=</span> <span class="token number">1</span><span class="token punctuation">;</span>
+<span class="token punctuation">}</span>
+</code></pre>
+            <p>If B is pressed and the speed isn’t already 1, decrease it.</p>
+            <pre class=" language-java"><code class="prism  language-java"><span class="token keyword">if</span><span class="token punctuation">(</span><span class="token operator">!</span>fsswitch <span class="token operator">&amp;&amp;</span> gamepad1<span class="token punctuation">.</span>a <span class="token operator">&amp;&amp;</span> speed <span class="token operator">&lt;</span> <span class="token number">10</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    speed <span class="token operator">+=</span> <span class="token number">1</span><span class="token punctuation">;</span>
+<span class="token punctuation">}</span>
+</code></pre>
+            <p>If A is pressed and the speed isn’t already 10, increase it.</p>
+            <pre class=" language-java"><code class="prism  language-java"><span class="token keyword">if</span><span class="token punctuation">(</span><span class="token operator">!</span>ltswitch <span class="token operator">&amp;&amp;</span> gamepad1<span class="token punctuation">.</span>back<span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    setangle <span class="token operator">=</span> <span class="token function">wrap</span><span class="token punctuation">(</span>currentAngle <span class="token operator">+</span> <span class="token number">90</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    turning <span class="token operator">=</span> <span class="token boolean">true</span><span class="token punctuation">;</span>
+<span class="token punctuation">}</span>
+</code></pre>
+            <p>If back is pressed, set our desired angle to our current angle + 90° and temporarily enable <abbr title="self-rightingness">righteousness</abbr> for the turn.</p>
+            <pre class=" language-java"><code class="prism  language-java"><span class="token keyword">if</span><span class="token punctuation">(</span><span class="token operator">!</span>rtswitch <span class="token operator">&amp;&amp;</span> gamepad1<span class="token punctuation">.</span>start<span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    setangle <span class="token operator">=</span> <span class="token function">wrap</span><span class="token punctuation">(</span>currentAngle <span class="token operator">-</span> <span class="token number">90</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    turning <span class="token operator">=</span> <span class="token boolean">true</span><span class="token punctuation">;</span>
+<span class="token punctuation">}</span>
+</code></pre>
+            <p>If back is pressed, set our desired angle to our current angle - 90° and temporarily enable <abbr title="self-rightingness">righteousness</abbr> for the turn.</p>
+            <pre class=" language-java"><code class="prism  language-java">etcswitch <span class="token operator">=</span> gamepad1<span class="token punctuation">.</span>etc
+<span class="token punctuation">.</span><span class="token punctuation">.</span><span class="token punctuation">.</span>
+</code></pre>
+            <p>Store button states for next round.</p>
+            <h4 id="telemetry">Telemetry</h4>
+            <pre class=" language-java"><code class="prism  language-java">telemetry<span class="token punctuation">.</span><span class="token function">addData</span><span class="token punctuation">(</span><span class="token string">"fieldcentric (X to toggle)"</span><span class="token punctuation">,</span> fieldcentric<span class="token punctuation">)</span><span class="token punctuation">;</span>
+telemetry<span class="token punctuation">.</span><span class="token function">addData</span><span class="token punctuation">(</span><span class="token string">"righteous (Y to toggle)"</span><span class="token punctuation">,</span> righteous<span class="token punctuation">)</span><span class="token punctuation">;</span>
+telemetry<span class="token punctuation">.</span><span class="token function">addData</span><span class="token punctuation">(</span><span class="token string">"speed (A/B +/-)"</span><span class="token punctuation">,</span> speed<span class="token punctuation">)</span><span class="token punctuation">;</span>
+</code></pre>
+            <p>Add drive mode info and help to telemetry.</p>
+            <pre class=" language-java"><code class="prism  language-java">telemetry<span class="token punctuation">.</span><span class="token function">addData</span><span class="token punctuation">(</span><span class="token string">""</span><span class="token punctuation">,</span> null<span class="token punctuation">)</span><span class="token punctuation">;</span>
+telemetry<span class="token punctuation">.</span><span class="token function">addData</span><span class="token punctuation">(</span><span class="token string">"r"</span><span class="token punctuation">,</span> r<span class="token punctuation">)</span><span class="token punctuation">;</span>
+telemetry<span class="token punctuation">.</span><span class="token function">addData</span><span class="token punctuation">(</span><span class="token string">"theta"</span><span class="token punctuation">,</span> theta<span class="token punctuation">)</span><span class="token punctuation">;</span>
+</code></pre>
+            <p>Add polar coordinates to telemetry.</p>
+            <pre class=" language-java"><code class="prism  language-java"><span class="token keyword">for</span><span class="token punctuation">(</span><span class="token keyword">int</span> i <span class="token operator">=</span> <span class="token number">0</span><span class="token punctuation">;</span> i <span class="token operator">!=</span> wheels<span class="token punctuation">.</span>length<span class="token punctuation">;</span> i<span class="token operator">++</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    telemetry<span class="token punctuation">.</span><span class="token function">addData</span><span class="token punctuation">(</span><span class="token string">"wheel "</span> <span class="token operator">+</span> Integer<span class="token punctuation">.</span><span class="token function">toString</span><span class="token punctuation">(</span>i <span class="token operator">+</span> <span class="token number">1</span><span class="token punctuation">)</span><span class="token punctuation">,</span> powers<span class="token punctuation">[</span>i<span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token punctuation">}</span>
+</code></pre>
+            <p>Add all wheel powers to telemetry.</p>
+            <pre class=" language-java"><code class="prism  language-java"><span class="token keyword">if</span><span class="token punctuation">(</span>fieldcentric <span class="token operator">||</span> righteous <span class="token operator">||</span> turning<span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    telemetry<span class="token punctuation">.</span><span class="token function">addData</span><span class="token punctuation">(</span><span class="token string">""</span><span class="token punctuation">,</span> null<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    telemetry<span class="token punctuation">.</span><span class="token function">addData</span><span class="token punctuation">(</span><span class="token string">"angle"</span><span class="token punctuation">,</span> currentAngle<span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token punctuation">}</span>
+</code></pre>
+            <p>If the gyroscope is being used, add the raw angle to telemetry.</p>
+            <pre class=" language-java"><code class="prism  language-java"><span class="token keyword">if</span><span class="token punctuation">(</span>fieldcentric<span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    telemetry<span class="token punctuation">.</span><span class="token function">addData</span><span class="token punctuation">(</span><span class="token string">"zero"</span><span class="token punctuation">,</span> zero<span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token punctuation">}</span>
+</code></pre>
+            <p>If field-centric is enabled, add our current zero to telemetry.</p>
+            <pre class=" language-java"><code class="prism  language-java"><span class="token keyword">if</span><span class="token punctuation">(</span>righteous <span class="token operator">||</span> turning<span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    telemetry<span class="token punctuation">.</span><span class="token function">addData</span><span class="token punctuation">(</span><span class="token string">"delta"</span><span class="token punctuation">,</span> delta<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    telemetry<span class="token punctuation">.</span><span class="token function">addData</span><span class="token punctuation">(</span><span class="token string">"turn"</span><span class="token punctuation">,</span> turn<span class="token operator">*</span><span class="token number">180</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token punctuation">}</span>
+</code></pre>
+            <p>If <abbr title="self-righting">righteous</abbr> (or turning), add the needed turn and the current turn to telemetry.</p>
+            <pre class=" language-java"><code class="prism  language-java"><span class="token function">updateTelemetry</span><span class="token punctuation">(</span>telemetry<span class="token punctuation">)</span><span class="token punctuation">;</span>
+</code></pre>
+            <p>Send the updated telemetry to the driver station.</p>
+            <h3 id="wrap"><code>wrap()</code></h3>
+            <pre class=" language-java"><code class="prism  language-java"><span class="token keyword">private</span> <span class="token keyword">double</span> <span class="token function">wrap</span><span class="token punctuation">(</span><span class="token keyword">double</span> input<span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    <span class="token keyword">while</span><span class="token punctuation">(</span>Math<span class="token punctuation">.</span><span class="token function">abs</span><span class="token punctuation">(</span>input<span class="token punctuation">)</span> <span class="token operator">&gt;</span> <span class="token number">180</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+        <span class="token keyword">if</span><span class="token punctuation">(</span>input <span class="token operator">&lt;</span> <span class="token operator">-</span><span class="token number">180</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+            input <span class="token operator">+=</span> <span class="token number">360</span><span class="token punctuation">;</span>
+        <span class="token punctuation">}</span>
+        <span class="token keyword">else</span> <span class="token punctuation">{</span>
+            input <span class="token operator">-=</span> <span class="token number">360</span><span class="token punctuation">;</span>
+        <span class="token punctuation">}</span>
+    <span class="token punctuation">}</span>
+    <span class="token keyword">return</span> input<span class="token punctuation">;</span>
+<span class="token punctuation">}</span>
+</code></pre>
+            <p>This function takes a number and subtracts 360 if it’s over 180 and adds 360 if it’s under -180. It is used to wrap the angles around, effectively turning the angle from the gyroscope into a circle instead of a line from -180 to 180.</p>
+            <h2 id="how-it-works"><abbr title="Shift + scroll to scroll horizontally">How it works</abbr></h2>
+            <div class="mermaid"><svg xmlns="http://www.w3.org/2000/svg" id="mermaid-svg-OJtpGhPUhxRZrmpn" height="100%" width="100%" style="max-width:1712px;" viewBox="-50 -10 1712 866"><g></g><g><line id="actor56" x1="75" y1="5" x2="75" y2="855" class="actor-line" stroke-width="0.5px" stroke="#999"></line><rect x="0" y="0" fill="#eaeaea" stroke="#666" width="150" height="65" rx="3" ry="3" class="actor"></rect><text x="75" y="32.5" dominant-baseline="central" alignment-baseline="central" class="actor" style="text-anchor: middle;"><tspan x="75" dy="0">Left joy X/Y</tspan></text></g><g><line id="actor57" x1="275" y1="5" x2="275" y2="855" class="actor-line" stroke-width="0.5px" stroke="#999"></line><rect x="200" y="0" fill="#eaeaea" stroke="#666" width="150" height="65" rx="3" ry="3" class="actor"></rect><text x="275" y="32.5" dominant-baseline="central" alignment-baseline="central" class="actor" style="text-anchor: middle;"><tspan x="275" dy="0">r</tspan></text></g><g><line id="actor58" x1="475" y1="5" x2="475" y2="855" class="actor-line" stroke-width="0.5px" stroke="#999"></line><rect x="400" y="0" fill="#eaeaea" stroke="#666" width="150" height="65" rx="3" ry="3" class="actor"></rect><text x="475" y="32.5" dominant-baseline="central" alignment-baseline="central" class="actor" style="text-anchor: middle;"><tspan x="475" dy="0">theta</tspan></text></g><g><line id="actor59" x1="675" y1="5" x2="675" y2="855" class="actor-line" stroke-width="0.5px" stroke="#999"></line><rect x="600" y="0" fill="#eaeaea" stroke="#666" width="150" height="65" rx="3" ry="3" class="actor"></rect><text x="675" y="32.5" dominant-baseline="central" alignment-baseline="central" class="actor" style="text-anchor: middle;"><tspan x="675" dy="0">gyro</tspan></text></g><g><line id="actor60" x1="875" y1="5" x2="875" y2="855" class="actor-line" stroke-width="0.5px" stroke="#999"></line><rect x="800" y="0" fill="#eaeaea" stroke="#666" width="150" height="65" rx="3" ry="3" class="actor"></rect><text x="875" y="32.5" dominant-baseline="central" alignment-baseline="central" class="actor" style="text-anchor: middle;"><tspan x="875" dy="0">setangle</tspan></text></g><g><line id="actor61" x1="1075" y1="5" x2="1075" y2="855" class="actor-line" stroke-width="0.5px" stroke="#999"></line><rect x="1000" y="0" fill="#eaeaea" stroke="#666" width="150" height="65" rx="3" ry="3" class="actor"></rect><text x="1075" y="32.5" dominant-baseline="central" alignment-baseline="central" class="actor" style="text-anchor: middle;"><tspan x="1075" dy="0">delta</tspan></text></g><g><line id="actor62" x1="1275" y1="5" x2="1275" y2="855" class="actor-line" stroke-width="0.5px" stroke="#999"></line><rect x="1200" y="0" fill="#eaeaea" stroke="#666" width="150" height="65" rx="3" ry="3" class="actor"></rect><text x="1275" y="32.5" dominant-baseline="central" alignment-baseline="central" class="actor" style="text-anchor: middle;"><tspan x="1275" dy="0">turn (right joy X)</tspan></text></g><g><line id="actor63" x1="1475" y1="5" x2="1475" y2="855" class="actor-line" stroke-width="0.5px" stroke="#999"></line><rect x="1400" y="0" fill="#eaeaea" stroke="#666" width="150" height="65" rx="3" ry="3" class="actor"></rect><text x="1475" y="32.5" dominant-baseline="central" alignment-baseline="central" class="actor" style="text-anchor: middle;"><tspan x="1475" dy="0">wheel powers</tspan></text></g><defs><marker id="arrowhead" refX="5" refY="2" markerWidth="6" markerHeight="4" orient="auto"><path d="M 0,0 V 4 L6,2 Z"></path></marker></defs><defs><marker id="crosshead" markerWidth="15" markerHeight="8" orient="auto" refX="16" refY="4"><path fill="black" stroke="#000000" stroke-width="1px" d="M 9,2 V 6 L16,4 Z" style="stroke-dasharray: 0, 0;"></path><path fill="none" stroke="#000000" stroke-width="1px" d="M 0,1 L 6,7 M 6,1 L 0,7" style="stroke-dasharray: 0, 0;"></path></marker></defs><g><text x="175" y="93" class="messageText" style="text-anchor: middle;">min(sqrt(x*x+y*y)</text><line x1="75" y1="100" x2="275" y2="100" class="messageLine0" stroke-width="2" stroke="black" marker-end="url(#arrowhead)" style="fill: none;"></line></g><g><text x="275" y="128" class="messageText" style="text-anchor: middle;">atan2(x, y)</text><line x1="75" y1="135" x2="475" y2="135" class="messageLine0" stroke-width="2" stroke="black" marker-end="url(#arrowhead)" style="fill: none;"></line></g><g><text x="575" y="188" class="messageText" style="text-anchor: middle;">Add to account for robot rotation</text><line x1="675" y1="195" x2="475" y2="195" class="messageLine1" stroke-width="2" stroke="black" marker-end="url(#arrowhead)" style="stroke-dasharray: 3, 3; fill: none;"></line></g><g><line x1="465" y1="145" x2="685" y2="145" class="loopLine"></line><line x1="685" y1="145" x2="685" y2="205" class="loopLine"></line><line x1="465" y1="205" x2="685" y2="205" class="loopLine"></line><line x1="465" y1="145" x2="465" y2="205" class="loopLine"></line><polygon points="465,145 515,145 515,158 506.6,165 465,165" class="labelBox"></polygon><text x="472.5" y="160" fill="black" class="labelText"><tspan x="472.5" fill="black">opt</tspan></text><text x="575" y="160" fill="black" class="loopText" style="text-anchor: middle;"><tspan x="575" fill="black">[ if field centric ]</tspan></text></g><g><text x="775" y="283" class="messageText" style="text-anchor: middle;"></text><line x1="675" y1="290" x2="875" y2="290" class="messageLine0" stroke-width="2" stroke="black" marker-end="url(#arrowhead)" style="fill: none;"></line></g><g><text x="875" y="338" class="messageText" style="text-anchor: middle;"></text><line x1="675" y1="345" x2="1075" y2="345" class="messageLine0" stroke-width="2" stroke="black" marker-end="url(#arrowhead)" style="fill: none;"></line></g><g><text x="975" y="373" class="messageText" style="text-anchor: middle;">Subtract to obtain desired angle</text><line x1="875" y1="380" x2="1075" y2="380" class="messageLine1" stroke-width="2" stroke="black" marker-end="url(#arrowhead)" style="stroke-dasharray: 3, 3; fill: none;"></line></g><g><text x="1175" y="408" class="messageText" style="text-anchor: middle;"></text><line x1="1075" y1="415" x2="1275" y2="415" class="messageLine0" stroke-width="2" stroke="black" marker-end="url(#arrowhead)" style="fill: none;"></line></g><g><line x1="665" y1="240" x2="1285" y2="240" class="loopLine"></line><line x1="1285" y1="240" x2="1285" y2="425" class="loopLine"></line><line x1="665" y1="425" x2="1285" y2="425" class="loopLine"></line><line x1="665" y1="240" x2="665" y2="425" class="loopLine"></line><line x1="665" y1="300" x2="1285" y2="300" class="loopLine" style="stroke-dasharray: 3, 3;"></line><polygon points="665,240 715,240 715,253 706.6,260 665,260" class="labelBox"></polygon><text x="672.5" y="255" fill="black" class="labelText"><tspan x="672.5" fill="black">alt</tspan></text><text x="975" y="255" fill="black" class="loopText" style="text-anchor: middle;"><tspan x="975" fill="black">[ if actively turning ]</tspan></text><text x="975" y="315" fill="black" class="loopText" style="text-anchor: middle;"><tspan x="975" fill="black">[ NOT actively turning ]</tspan></text></g><g><line x1="655" y1="215" x2="1295" y2="215" class="loopLine"></line><line x1="1295" y1="215" x2="1295" y2="435" class="loopLine"></line><line x1="655" y1="435" x2="1295" y2="435" class="loopLine"></line><line x1="655" y1="215" x2="655" y2="435" class="loopLine"></line><polygon points="655,215 705,215 705,228 696.6,235 655,235" class="labelBox"></polygon><text x="662.5" y="230" fill="black" class="labelText"><tspan x="662.5" fill="black">opt</tspan></text><text x="975" y="230" fill="black" class="loopText" style="text-anchor: middle;"><tspan x="975" fill="black">[ If righteous ]</tspan></text></g><g><text x="275" y="463" class="messageText" style="text-anchor: middle;">^3</text><path d="M 275,470 C 335,460 335,500 275,490" class="messageLine0" stroke-width="2" stroke="black" style="fill: none;"></path></g><g><text x="1475" y="553" class="messageText" style="text-anchor: middle;">Wheel angle</text><path d="M 1475,560 C 1535,550 1535,590 1475,580" class="messageLine0" stroke-width="2" stroke="black" style="fill: none;"></path></g><g><text x="975" y="618" class="messageText" style="text-anchor: middle;">Subtract to determine angle being driven in relative to the wheel</text><line x1="475" y1="625" x2="1475" y2="625" class="messageLine1" stroke-width="2" stroke="black" marker-end="url(#arrowhead)" style="stroke-dasharray: 3, 3; fill: none;"></line></g><g><text x="1475" y="653" class="messageText" style="text-anchor: middle;">Sine to determine power from angle</text><path d="M 1475,660 C 1535,650 1535,690 1475,680" class="messageLine0" stroke-width="2" stroke="black" style="fill: none;"></path></g><g><text x="875" y="718" class="messageText" style="text-anchor: middle;">Multiply to account for joystick power</text><line x1="275" y1="725" x2="1475" y2="725" class="messageLine1" stroke-width="2" stroke="black" marker-end="url(#arrowhead)" style="stroke-dasharray: 3, 3; fill: none;"></line></g><g><text x="1375" y="753" class="messageText" style="text-anchor: middle;">Add to account for turning</text><line x1="1275" y1="760" x2="1475" y2="760" class="messageLine1" stroke-width="2" stroke="black" marker-end="url(#arrowhead)" style="stroke-dasharray: 3, 3; fill: none;"></line></g><g><line x1="265" y1="510" x2="1612" y2="510" class="loopLine"></line><line x1="1612" y1="510" x2="1612" y2="770" class="loopLine"></line><line x1="265" y1="770" x2="1612" y2="770" class="loopLine"></line><line x1="265" y1="510" x2="265" y2="770" class="loopLine"></line><polygon points="265,510 315,510 315,523 306.6,530 265,530" class="labelBox"></polygon><text x="272.5" y="525" fill="black" class="labelText"><tspan x="272.5" fill="black">loop</tspan></text><text x="938.5" y="525" fill="black" class="loopText" style="text-anchor: middle;"><tspan x="938.5" fill="black">[ for each wheel ]</tspan></text></g><g><rect x="0" y="790" fill="#eaeaea" stroke="#666" width="150" height="65" rx="3" ry="3" class="actor"></rect><text x="75" y="822.5" dominant-baseline="central" alignment-baseline="central" class="actor" style="text-anchor: middle;"><tspan x="75" dy="0">Left joy X/Y</tspan></text></g><g><rect x="200" y="790" fill="#eaeaea" stroke="#666" width="150" height="65" rx="3" ry="3" class="actor"></rect><text x="275" y="822.5" dominant-baseline="central" alignment-baseline="central" class="actor" style="text-anchor: middle;"><tspan x="275" dy="0">r</tspan></text></g><g><rect x="400" y="790" fill="#eaeaea" stroke="#666" width="150" height="65" rx="3" ry="3" class="actor"></rect><text x="475" y="822.5" dominant-baseline="central" alignment-baseline="central" class="actor" style="text-anchor: middle;"><tspan x="475" dy="0">theta</tspan></text></g><g><rect x="600" y="790" fill="#eaeaea" stroke="#666" width="150" height="65" rx="3" ry="3" class="actor"></rect><text x="675" y="822.5" dominant-baseline="central" alignment-baseline="central" class="actor" style="text-anchor: middle;"><tspan x="675" dy="0">gyro</tspan></text></g><g><rect x="800" y="790" fill="#eaeaea" stroke="#666" width="150" height="65" rx="3" ry="3" class="actor"></rect><text x="875" y="822.5" dominant-baseline="central" alignment-baseline="central" class="actor" style="text-anchor: middle;"><tspan x="875" dy="0">setangle</tspan></text></g><g><rect x="1000" y="790" fill="#eaeaea" stroke="#666" width="150" height="65" rx="3" ry="3" class="actor"></rect><text x="1075" y="822.5" dominant-baseline="central" alignment-baseline="central" class="actor" style="text-anchor: middle;"><tspan x="1075" dy="0">delta</tspan></text></g><g><rect x="1200" y="790" fill="#eaeaea" stroke="#666" width="150" height="65" rx="3" ry="3" class="actor"></rect><text x="1275" y="822.5" dominant-baseline="central" alignment-baseline="central" class="actor" style="text-anchor: middle;"><tspan x="1275" dy="0">turn (right joy X)</tspan></text></g><g><rect x="1400" y="790" fill="#eaeaea" stroke="#666" width="150" height="65" rx="3" ry="3" class="actor"></rect><text x="1475" y="822.5" dominant-baseline="central" alignment-baseline="central" class="actor" style="text-anchor: middle;"><tspan x="1475" dy="0">wheel powers</tspan></text></g></svg></div>
+            <hr class="footnotes-sep">
+            <section class="footnotes">
+                <ol class="footnotes-list">
+                    <li id="fn1" class="footnote-item">
+                        <p>The guide button located in the center of Logitech controllers <a href="#fnref1" class="footnote-backref">↩︎</a> <a href="#fnref1:1" class="footnote-backref">↩︎</a></p>
+                    </li>
+                    <li id="fn2" class="footnote-item">
+                        <p>While using the self-righting drive mode, you may notice a counterturn at the end of turns. This is due to Newton’s third law of motion, which states that for every action there is a reaction, therefore; for every turn there is
+                            a re-turn. <sup class="footnote-ref"><a href="#fn3" id="fnref3">3</a></sup> <a href="#fnref2" class="footnote-backref">↩︎</a></p>
+                    </li>
+                    <li id="fn3" class="footnote-item">
+                        <p>Kidding. It’s actually Newton’s first law, which states that a body in motion will stay in motion. The rotational inertia of the robot continues to rotate the robot after the joystick is released, which is then counteracted by
+                            the code. <a href="#fnref3" class="footnote-backref">↩︎</a></p>
+                    </li>
+                </ol>
+            </section>
+
+        </div>
+    </div>
+</body>
+
+</html>
